@@ -52,6 +52,18 @@
 
 12. **OC 中 block 的本质**
     - block 本质上是一个 Objc 对象，它内部也有 isa 指针，这个对象封装了函数的调用地址(函数指针)以及函数调用的环境（函数参数、返回值、捕获的外部变量等）。
+
+    - 如下所示 block 的源码实现:
+
+        ```c
+        // block类的结构体指针，每个block的这个都是相同的，存储一些block常用的标识等等
+        struct __block_impl {
+            void *isa;      // 指向所属类的指针，也就是 Block 类型，参考OC的self指针
+            int Flags;      // 标志变量，在实现 block 的内部操作时会用到
+            int Reserved;   // 保留变量
+            void *FuncPtr;  // block 执行时调用的函数指针，其指向block代码块中的地址
+        };
+        ```
     
 11. **block 存放在哪里，分为几种**
     - data 区
