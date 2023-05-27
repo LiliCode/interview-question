@@ -14,6 +14,7 @@
 3. **Swift 中类和结构体的区别**
     - 类有继承，结构体没有继承，所以也就没有重写、多态等特性
     - 类比结构体复杂，类编译后的汇编代码比结构体多，所以，结构体的运行效率要比类快一点。
+    - 结构体的一些属性默认是不能被改变的，如果需要在方法中改变，可以选择在 func 关键字前加上 `mutating` 关键字来指定实例方法内可以修改属性
 
       >**提示**
       一些明确的类，结构简单，就只放些属性和方法，没有继承啥的，建议使用结构体代替类。
@@ -153,6 +154,9 @@
     - KVO 基于 runtime 实现
     - 当一个对象执行 addObserver 之后，对象指向父类的指针 isa 变成了指向一个新的类 `NSKVONotifying_XXX`，当一个类 Person 有一个属性叫 name，Person 类的对象的 name 属性发生改变的时候，`NSNotifying_Person` 的 setName 方法里面调用 [super setName:] [self willChangeValueForKey:@"name"] [self didChangeValueForKey:@"name"]，后面的这个两个方法中会调用监听者内部的 `observeValueForKeyPath` 方法。
 
+    >**参考资料**
+    https://juejin.cn/post/6939858821581897741
+
 18. **OC 中 KVC 的原理是什么**
     ```objc
         Person *p = [[Person alloc] init];
@@ -166,7 +170,91 @@
         3. 不存在 `_` 开头的成员变量 _key 就查找是否存在这个属性 key，有就直接使用
         4. 不存在这个属性 key，就调用 `setValue: forUndefineKey:` 或者 `valueForUndefineKey:` 方法抛出异常
 
+19. **OC 中的 isa 指针**
+    - isa 指针在类中的示意图
+    ![](./assets/isa-pointer.png)
 
+    - 上图可以得出：
+        1. 实例对象的 isa 指向 class 对象。
+        2. 当调用对象方法时，通过实例的 isa 找到 class，最后找到对象方法的实现进行调用。
+        3. class 对象的 isa 指向 `meta-class` 对象
+        4. 当调用类方法时，通过 class 的 isa 找到 `meta-class`，最后找到类方法的实现进行调用。
+
+        >**得出结论**
+            1. 实例对象的 isa 指向 class 对象。
+            2. class 对象的 isa 指向 meta-class 对象。
+            3. meta-class 对象的 isa 指向基类的 meta-class 对象。
+
+        参考地址: https://blog.csdn.net/weixin_38633659/article/details/124544684
+
+    - 实例对象调用方法的轨迹：通过 isa 获取 class 对象，找到对象方法调用，如果方法不存在，就通过 superclass 找父类，直到找到止。如果是在找不到就会报错崩溃: `unrecognized selector sent to instance 0x600000209320`
+
+20. **OC 对象 superClass 指针**
+    - class 对象的 superclass 指向父类的 class 对象，如果没有父类，superclass 指针为 nil。
+    - meta-class 对象的 superclass 指向父类的 meta-class 对象
+    - 基类的 meta-class 对象的 superclass 指向基类的 class 对象
+
+21. **OC 中 meta-class 对象的 superclass 指针**
+    - meta-class 元类，存储了一个类的所有类方法。每个类的元类都是独一无二的，因为每个类都有一系列独特的类方法。
+    - class 对象调用类方法的轨迹：isa 找 meta-class 对象，方法不存在，就通过 superclass 找父类，一直找到基类的meta-class 对象，如果还没有找到，继续通过 superclass 指向基类的class对象。直到找到为止。
+
+21. **分类(Categroy)和扩展(Extension)的区别**
+    - 分类有名字，扩展则没有
+    - 分类只能扩展方法，扩展既能扩展属性又能扩展方法
+    - 分类扩展的方法外部可见，扩展中的方法和属性都是私有的
+    - 分类中添加的方法如果和当前类中的方法一样，则会覆盖掉当前类的中这个方法；
+    
+        >**拓展**
+        如果分类中声明了一个属性，那么分类只会生成这个属性的 set、get 方法声明，也就是不会有实现，使用这个属性会报错
+
+22. **分类(Category)中如何扩展属性**
+    - 使用 runtime 的 `objc_setAssociatedObject` `objc_getAssociatedObject` 关联对象和获取关联对象两个函数实现。objc_setAssociatedObject 是将一个对象关联到另一个对象上，objc_getAssociatedObject 通过 key 获取被关联的对象值。
+        ```c
+        // object: 关联者对象
+        // key: objc_getAssociatedObject 函数会通过这个 key 值获取被关联者对象
+        // value: 被关联者对象
+        // policy: 关联时采用的协议，有 assign，retain，copy 等协议
+        void objc_setAssociatedObject(id _Nonnull object, const void * _Nonnull key, id _Nullable value, objc_AssociationPolicy policy)
+
+        // object：关联者对象
+        // key objc_setAssociatedObject 函数被关联设置的 key
+        id _Nullable objc_getAssociatedObject(id _Nonnull object, const void * _Nonnull key)
+        ```
+
+    - 如下所示
+
+        ```objc
+        @interface Person (Cate)
+        @property (nonatomic, assign) double height;
+
+        @end
+
+        @implementation Person (Cate)
+
+        - (void)setHeight:(double)height {
+            objc_setAssociatedObject(self, _cmd, @(height), OBJC_ASSOCIATION_ASSIGN);
+        }
+
+        - (double)height {
+            return [objc_getAssociatedObject(self, @selector(setHeight:)) doubleValue];
+        }
+
+        @end
+        ```
+
+        上面代码中 `_cmd` 就是当前方法的 `SEL` 指针，这个两个函数需要通过一个 key 去存值和取值，key 是一个 `void *` 无类型指针，所以这里使用当前方法的 SEL 指针最合适不过了（既优雅又实用）。
+
+23. **OC 中调用 Swift 代码**
+    1. Swift 类必须继承 NSObject 类，并且 class 关键字前面必须加上 `@objc` 或者 `@objcMembers`
+        >**注意**
+        class 前面使用 @objc ，在对应的方法或者属性也需要使用 @objc，而 @objcMembers 则不需要
+    2. 在对应的 Objc 文件中添加头文件，头文件一般都是 `工程名-Swift.h` 的形式
+    3. 在 Objc 代码中按照 Objc 的风格使用。
+
+24. **@objc 与 @objcMembers 的区别**
+    - 在Swift中，继承自 NSObject 的类如果有比较多的属性或方法都需要加上 `@objc` 的话，会多比较多的代码。那么可以利用 `@objcMembers` 减少代码。
+    - 被 @objcMembers 修饰的类，会默认为类、子类、类扩展和子类扩展的所有属性和方法都加上 @objc。
+    - 如果想让某一个扩展关闭 @objc，则可以用 `@nonobjc` 进行修饰。
 
 
 ## 多线程
