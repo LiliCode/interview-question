@@ -145,6 +145,30 @@
 15. **__strong 是什么**
     - `__strong` 强引用；相当于声明一个局部变量, 在 block 使用完之后才会释放。也就是说保证在 block 调用完之前, 对象不会被释放。
 
+16. **KVO 和 KVC 是什么**
+    - KVO 键值监听，提供了观察某一个属性变化的方法
+    - KVC 键值编码，通过字符串去访问或者修改一个属性的值
+
+17. **OC 中 KVO 的原理是什么**
+    - KVO 基于 runtime 实现
+    - 当一个对象执行 addObserver 之后，对象指向父类的指针 isa 变成了指向一个新的类 `NSKVONotifying_XXX`，当一个类 Person 有一个属性叫 name，Person 类的对象的 name 属性发生改变的时候，`NSNotifying_Person` 的 setName 方法里面调用 [super setName:] [self willChangeValueForKey:@"name"] [self didChangeValueForKey:@"name"]，后面的这个两个方法中会调用监听者内部的 `observeValueForKeyPath` 方法。
+
+18. **OC 中 KVC 的原理是什么**
+    ```objc
+        Person *p = [[Person alloc] init];
+        [p setValue:@"Tom" forKey:@"name"];
+        [p valueForKey:@"name"];
+    ```
+    - 如上述代码：
+
+        1. 首先查找一个对象中和 key 相对应的 setter 或者 getter 方法，有就直接调用
+        2. 不存在 setter 或者 getter 方法，就查找是否存在以 `_`开头的成员变量 _key，有就访问
+        3. 不存在 `_` 开头的成员变量 _key 就查找是否存在这个属性 key，有就直接使用
+        4. 不存在这个属性 key，就调用 `setValue: forUndefineKey:` 或者 `valueForUndefineKey:` 方法抛出异常
+
+
+
+
 ## 多线程
  
 1. **NSNotificationCenter 发送通知和接受通知在一个线程吗？**
