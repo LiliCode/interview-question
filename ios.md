@@ -51,6 +51,12 @@
       2. 添加引用时：objc_initWeak 函数会调用 objc_storeWeak() 函数， objc_storeWeak() 的作用是更新指针指向，创建对应的弱引用表。
       3. 释放时，调用 clearDeallocating 函数。clearDeallocating 函数首先根据对象地址获取所有weak指针地址的数组，然后遍历这个数组把其中的数据设为nil，最后把这个 entry从weak 表中删除，最后清理对象的记录。
 
+    - 为什么在对象释放之后，使用 weak 修饰的对象会自动设置成 nil
+      1. 因为在对象销毁后，会调用 dealloc 方法。
+      2. 在 dealloc 内部方法实现中，会调用 `weak_clear_no_lock()` 函数。
+      3. 在该函数内部，会根据当前对象指针，利用哈希算法，查找弱引用表，然后取出弱引用数组，遍历这个数组，将弱引用指针全部置为nil。
+
+
 12. **OC 中 block 的本质**
     - block 本质上是一个 Objc 对象，它内部也有 isa 指针，这个对象封装了函数的调用地址(函数指针)以及函数调用的环境（函数参数、返回值、捕获的外部变量等）。
 
@@ -256,6 +262,17 @@
     - 被 @objcMembers 修饰的类，会默认为类、子类、类扩展和子类扩展的所有属性和方法都加上 @objc。
     - 如果想让某一个扩展关闭 @objc，则可以用 `@nonobjc` 进行修饰。
 
+25. **自动释放池**
+    - release 可能会导致对象立即释放，如果频繁对对象进行 release，可能会造成琐碎的内存管理负担。autorelease 可以将release 的调用延迟到自动释放池被释放时。
+    - 推荐使用自动释放池（Autorelease Pool）Block，当期结束时，所有接受autorelease消息的对象将会被立即释放（即发送 release 消息）
+    - AppKit 和UIKit 框架在处理每一次事件循环迭代时，都会将其放入一个 Autorelease Pool 中。大多数情况，开发人员无需处理。
+
+26. **什么时候需要手工管理 Autorelease Pool**
+    - 编写的程序不基于UI框架，如命令行程序
+    - 在循环中创建大量临时对象，需要更早地释放，避免临时对象聚集导致内存峰值过大
+    - 在主线程之外创建新的线程，在新线程开始执行处，需要创建自己的 Autorelease Pool
+    - 可以嵌套使用 Autorelease Pool
+
 
 ## 多线程
  
@@ -452,7 +469,7 @@
     - NSTimer 其实也是一种事件，而所有的 source（事件）如果要起作用，必须添加到 RunLoop 中，并且此 RunLoop 是有效的，并运行着。同理 timer 这种 source（事件）要想起作用，那肯定也需要加到 RunLoop 中才会有效。 如果一个 RunLoop 里面不包含任何 source（事件）的话，运行该 RunLoop 时会立即退出。
 
 
-2. **NSTimer 在 UIScrollView 中的为什么会挂起**
+3. **NSTimer 在 UIScrollView 中的为什么会挂起**
     - 使用了 scheduledTimerWithTimeInterval 方法在主线程创建的定时器，会在创建后自动将 timer
     添加到主线程的 RunLoop 并启动，主线程的 runloopMode 为 NSDefaultRunLoopMode，但是在 ScrollView 滑动时执行的是 UITrackingRunLoopMode，NSDefaultRunLoopMode 被挂起，定时器失效，等到停止滑动才恢复； 因此需要将 timer 分别加入 UITrackingRunLoopMode 和 NSDefaultRunLoopMode 中，或者直接添加到 NSRunLoopCommonModes 模式中。
     
@@ -463,6 +480,67 @@
             print("执行了 timer => \(count)")
         }
         RunLoop.current.add(timer, forMode: .common)
+        ```
+4. **Timer 的循环引用如何解决**
+    - 先看看 Timer 的循环引用是怎么引起的
+        ![](./assets/timer-cycle.webp)
+
+        1. 因为当前对象拥有 NSTimer，所以要对其强引用。
+        2. 因为 NSTimer 持有它的 target（当前对象），所以 NSTimer 强引用对象。
+        3. 通过对象弱引用 NSTimer，达不到解决循环引用的目的。
+ 
+    - 解决方案，创建一个中间对象充当代理的方式就可以解决问题
+
+        代理类 TimerProxy.swift 代码如下：
+
+        ```swift
+        import Foundation
+
+        protocol TimerProxyDelegate: NSObjectProtocol {
+            func timerExecuteTask() -> Void;
+        }
+
+        class TimerProxy {
+            weak var delegate: (TimerProxyDelegate)?
+            
+            init(delegate: TimerProxyDelegate? = nil) {
+                self.delegate = delegate
+            }
+            
+            @objc func executeTask() {
+                delegate?.timerExecuteTask()
+            }
+        }
+        ```
+        控制器代码如下：
+        ```swift
+        import UIKit
+
+        class TimerViewController: UIViewController, TimerProxyDelegate {
+            @IBOutlet weak var label: UILabel!
+            private var timer: Timer?
+            private var count: Int = 0
+            private lazy var proxy = TimerProxy(delegate: self)
+
+            override func viewDidLoad() {
+                super.viewDidLoad()
+                
+                label.text = "计时开始"
+                
+                timer = Timer.scheduledTimer(timeInterval: TimeInterval(1), target: proxy, selector: #selector(proxy.executeTask), userInfo: nil, repeats: true)
+            }
+            
+            func timerExecuteTask() {
+                count += 1
+                label.text = "计时器: \(count)"
+            }
+
+            deinit {
+                timer?.invalidate()
+                timer = nil
+                print("计时器销毁")
+            }
+        }
         ```
 
 3. **GCD 创建定时器**
@@ -494,4 +572,20 @@
         _timer = nil;
     }
     ```
+
+## UIKit 相关
+
+1. **UIView 和 CALayer 的关系**
+    - UIView 封装了 CALayer，本身不做渲染，可以响应触摸手势等事件；CALayer 渲染图层，不能响应触摸手势等事件。UIView 继承了 UIResponder，可以响应如下事件。CALayer 继承了 NSObject，所以不能响应事件。
+        ```objc
+        - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(nullable UIEvent *)event;
+        - (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(nullable UIEvent *)event;
+        - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(nullable UIEvent *)event;
+        - (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(nullable UIEvent *)event;
+        - (void)touchesEstimatedPropertiesUpdated:(NSSet<UITouch *> *)touches API_AVAILABLE(ios(9.1));
+        ```
+    - UIView 是iOS系统中界面元素的基础，所有的界面元素都继承自它。它本身完全是由CoreAnimation来实现的（Mac下似乎不是这样）。它真正的绘图部 分，是由一个叫CALayer（Core Animation Layer）的类来管理。UIView本身，更像是一个CALayer的管理器，访问它的跟绘图和跟坐标有关的属性，例如frame，bounds等等， 实际上内部都是在访问它所包含的CALayer的相关属性。
+
+2. **UIView 和 CALayer 的 Frame 映射**
+    - 一个 Layer 的 frame 是由它的 anchorPoint, position, bounds 和 transform 共同决定的，而一个 View 的 frame 只是简单的返回 Layer 的 frame，同样 View 的 center 和 bounds 也是返回 Layer 的一些属性。
 
