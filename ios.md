@@ -430,3 +430,68 @@
       >**温馨提示** 
       可以使用 CFRunLoopAddObserver 监听主线程的卡顿
 
+## 定时器
+
+1. **iOS 中有几种定时器可以使用**
+    - NSTimer
+        - 有两个 API 可以创建定时器
+            ```objc
+            + (NSTimer *)timerWithTimeInterval:(NSTimeInterval)ti target:(id)aTarget selector:(SEL)aSelector userInfo:(nullable id)userInfo repeats:(BOOL)yesOrNo;
+            + (NSTimer *)scheduledTimerWithTimeInterval:(NSTimeInterval)ti target:(id)aTarget selector:(SEL)aSelector userInfo:(nullable id)userInfo repeats:(BOOL)yesOrNo;
+            ```
+        - 这个两个方法的区别：
+            1. timerWithTimeInterval 这个方法创建的 timer 需要添加到 RunLoop 中才能执行。
+            2. scheduledTimerWithTimeInterval 在主线程创建的定时器会在创建后自动将 timer 添加到主线程的 runloop 并启动。
+
+    - CADisplayLink
+        - 一个特殊的定时器，可以使用这个对象来保持应用中的绘制与屏幕显示刷新的同步，常用来做绘制图形的渲染。
+    - GCD source 事件
+        - GCD 定时器比 NSTimer 更精确，定时器一定要被强引用，不然会被释放，导致的定时器无效；
+
+2. **NSTimer 为什么需要添加到 RunLoop 中**
+    - NSTimer 其实也是一种事件，而所有的 source（事件）如果要起作用，必须添加到 RunLoop 中，并且此 RunLoop 是有效的，并运行着。同理 timer 这种 source（事件）要想起作用，那肯定也需要加到 RunLoop 中才会有效。 如果一个 RunLoop 里面不包含任何 source（事件）的话，运行该 RunLoop 时会立即退出。
+
+
+2. **NSTimer 在 UIScrollView 中的为什么会挂起**
+    - 使用了 scheduledTimerWithTimeInterval 方法在主线程创建的定时器，会在创建后自动将 timer
+    添加到主线程的 RunLoop 并启动，主线程的 runloopMode 为 NSDefaultRunLoopMode，但是在 ScrollView 滑动时执行的是 UITrackingRunLoopMode，NSDefaultRunLoopMode 被挂起，定时器失效，等到停止滑动才恢复； 因此需要将 timer 分别加入 UITrackingRunLoopMode 和 NSDefaultRunLoopMode 中，或者直接添加到 NSRunLoopCommonModes 模式中。
+    
+        ```swift
+        var count: Int = 0
+        let timer = Timer(timeInterval: TimeInterval(1), repeats: true) { timer in
+            count += 1
+            print("执行了 timer => \(count)")
+        }
+        RunLoop.current.add(timer, forMode: .common)
+        ```
+
+3. **GCD 创建定时器**
+
+    ```c
+    - (void)gcdTimerDemoMethod {
+        __block int count = 0;
+        __block dispatch_source_t gcdTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());      //创建定时器，并指定线程，dispatch_source_t 本质上也是一个OC对象；
+        
+        dispatch_source_set_timer(gcdTimer, DISPATCH_TIME_NOW, (uint64_t)(1.0 * NSEC_PER_SEC), 0);   //设置定时器间隔时间
+        
+        //设置定时器 action
+        dispatch_source_set_event_handler(gcdTimer, ^{
+            NSLog(@"当前线程：%@", [NSThread currentThread]);
+            count++;
+            if (count == 4) {
+                // 取消定时器
+                dispatch_cancel(gcdTimer);
+                gcdTimer = nil;
+            }
+        });
+        dispatch_resume(gcdTimer);  //启动定时器
+    }
+
+    //定时器释放
+    - (void)dealloc {
+        dispatch_source_cancel(_timer);
+        dispatch_cancel(_timer);
+        _timer = nil;
+    }
+    ```
+
