@@ -273,6 +273,35 @@
     - 在主线程之外创建新的线程，在新线程开始执行处，需要创建自己的 Autorelease Pool
     - 可以嵌套使用 Autorelease Pool
 
+27. **Swift String 和 NSString 的区别**
+    String 保留了大部分 NSString 的 API，但是 String 的总体功能来看还是比NSString要更加强大，下面总结了几点区别:
+
+    - String 是值类型，NSString 是引用类型。
+    - String 字符串之间的拼接比 NSString 方便
+        ```objc
+        NSString  *strA  = @ "My name";
+        NSString  *strB  = @ " is dsx";
+        strA  = [ strA stringByAppendingString: strB];
+        ```
+
+        ```swift
+        let string = "My name" + " is tom"
+        ```
+
+    - String 可以实现字符串遍历
+        ```swift
+        for ch in "My name is tom" {
+            print(ch)
+        }
+        ```
+    - 计算字符串的长度不同，String 使用 `count`，NSString 使用 `length`
+    - String 没有将数字字符串转换成数字的 API，NSSrtring 自带 `integerValue`，`doubleValue`，Swift 想要将数字字符串转换成数字，必须使用对应类型数字的构造函数，例如:
+        ```swift
+        if let value = Int("190") {
+            print(value)
+        }
+        ```
+    
 
 ## 多线程
  
@@ -352,10 +381,67 @@
     >**提示**
     同步与异步指的是是否开启线程的能力
 
+7. **GCD 栅栏**
+    - 我们有时需要异步执行两组操作，而且第一组操作执行完之后，才能开始执行第二组操作。这样我们就需要一个相当于 栅栏 一样的一个方法将两组异步执行的操作组给分割起来，当然这里的操作组里可以包含一个或多个任务。这就需要用到 `dispatch_barrier_async` 方法在两个操作组间形成栅栏。
+    - dispatch_barrier_async 方法会等待前边追加到并发队列中的任务全部执行完毕之后，再将指定的任务追加到该异步队列中。然后在 dispatch_barrier_async 方法追加的任务执行完毕之后，异步队列才恢复为一般动作，接着追加任务到该异步队列并开始执行。
+
+        ```swift
+        let queue = DispatchQueue(label: "queue.com", attributes: .concurrent)
+        queue.async {
+            Thread.sleep(forTimeInterval: TimeInterval(1))
+            print("执行了任务 1")
+        }
+        queue.async {
+            Thread.sleep(forTimeInterval: TimeInterval(1))
+            print("执行了任务 2")
+        }
+        
+        /** 栅栏函数 */
+        queue.async(qos: .default, flags: .barrier, execute: {
+            Thread.sleep(forTimeInterval: TimeInterval(1))
+            print("执行了任务 3")
+        })
+        
+        queue.async {
+            Thread.sleep(forTimeInterval: TimeInterval(1))
+            print("执行了任务 4")
+        }
+        
+        queue.async {
+            Thread.sleep(forTimeInterval: TimeInterval(1))
+            print("执行了任务 5")
+        }
+        ```
+        上述代码，在执行完栅栏前面的操作之后，才执行栅栏操作，最后再执行栅栏后边的操作。
+
+8. **GCD 延迟执行任务**
+
+    - Swift 版本
+    ```swift
+    print("开始延迟执行")
+    DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 1) {
+        print("延迟执行")
+    }
+    ```
+
+    - ObjC 版本
+    ```c
+    NSLog(@"开始延迟执行");
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t) (0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        NSLog(@"延迟执行");
+    });
+    ```
+
+
 ## RunLoop
 
 1. **什么是 RunLoop? 和线程的关系?**
-    - RunLoop 就是运行循环，内部就是使用了一个 `do-while` 循环；RunLoop 和线程一一对应的关系，一个线程对应着一个 RunLoop，在其内部是使用的一个字典存储 RunLoop 和线程，线程作为键，RunLoop 作为值。
+    - RunLoop 是通过内部维护的事件循环(Event Loop)来对事件/消息进行管理的一个对象。内部就是使用了一个 `do-while` 循环；
+    - RunLoop 和线程一一对应的关系，一个线程对应着一个 RunLoop，在其内部是使用的一个字典存储 RunLoop 和线程，线程作为键，RunLoop 作为值。
+    - RunLoop 特点
+        1. 没有消息处理时，休眠已避免资源占用，由用户态切换到内核态(CPU-内核态和用户态)
+        2. 有消息需要处理时，立刻被唤醒，由内核态切换到用户态
+
 2. **RunLoop 的应用场景**
     线程保持存活、卡顿检测(Observer)、NSTimer 等一些操作
 3. **为什么需要线程保持存活？**
@@ -446,6 +532,10 @@
       ```
       >**温馨提示** 
       可以使用 CFRunLoopAddObserver 监听主线程的卡顿
+
+9. **为什么main函数不会退出**
+    - UIApplicationMain 函数中开启了主线程的 RunLoop 并一直循环执行，处理各种事件和消息。
+    - UIApplicationMain 函数一直没有返回，而是不断地接收处理消息以及等待休眠，所以运行程序之后会保持持续运行状态。
 
 ## 定时器
 
@@ -589,3 +679,15 @@
 2. **UIView 和 CALayer 的 Frame 映射**
     - 一个 Layer 的 frame 是由它的 anchorPoint, position, bounds 和 transform 共同决定的，而一个 View 的 frame 只是简单的返回 Layer 的 frame，同样 View 的 center 和 bounds 也是返回 Layer 的一些属性。
 
+3. **UIView 自定义 layer**
+    - 在 UIView 的子类中，重写 `layerClass` 方法，返回一个 layer 对象
+        ```swift
+        override class var layerClass: AnyClass {
+            return CALayer.self
+        }
+        ```
+        ```c
+        - (class)layerClass {   
+            return [CALayer class]; 
+        }
+        ```
