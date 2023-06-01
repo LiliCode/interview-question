@@ -416,6 +416,70 @@
             }
         }
         ```
+36. **Swift 和 Objective-C 中的初始化方法（init）有什么异同？**
+    简而言之，在 Swift 中的初始化方法更加严格和准确。
+
+    - Objective-C 中，初始化方法无法保证所有成员变量都完成初始化；编译器对属性设置并无警告，但是实际操作中会出现初始化不完全的问题；初始化方法与普通方法并无实际差别，可以多次调用。
+
+    - 在 Swift 中，初始化方法必须保证所有非 optional 的成员变量都完成初始化。同时新增 `convenience` 和 `required` 两个修饰初始化方法的关键词。convenience 只是提供一种方便的初始化方法，必须通过调用同一个类中 designated 初始化方法来完成。required 是强制子类重写父类中所修饰的初始化方法。
+37. **Swift 和 Objective-C 中的协议（Protocol）有什么异同？**
+    - 相同点在于，Swift 和 Objective-C 中的 Protocol 都可以被用作代理。Objective-C 中的 Protocol 类似于 Java 中的 Interface，实际开发中主要用于适配器模式（Adapter Pattern，详见第3章第4节设计模式）。
+
+    - 不同点在于，Swift 的 Protocol 还可以对接口进行抽象，例如 Sequence，配合拓展（extension）、泛型、关联类型等可以实现面向协议的编程，从而大大提高整个代码的灵活性。同时 Swift 的 Protocol 还可以用于值类型，如结构体和枚举。
+    - Objective-C 中的协议方法可以设置成可选实现或者必须实现，Swift 中的协议方法是必须实现，如果想要设置成可选请参照第35条问题
+
+38. **谈谈对 Objective-C 和 Swift 动态特性的理解**
+    runtime 其实就是 Objective-C 的动态机制。runtime 执行的是编译后的代码，这时它可以动态加载对象、添加方法、修改属性、传递信息等等。具体过程是在 Objective-C 中对象调用方法时，如 [self.tableview reload]，发生了两件事。
+
+    1. 编译阶段，编译器（compiler）会把这句话翻译成 objc_msgSend(self.tableview,[@selector](https://xiaozhuanlan.com/u/undefined)(reload))，把消息发送给 self.tableview。
+
+    2. 运行阶段，接收者 self.tableview 会响应这个消息，期间可能会直接执行、转发消息，也可能会找不到方法崩溃。
+
+    所以整个流程是编译器翻译–> 给接收者发送消息 –> 接收者响应消息三个流程。
+
+    如 [self.tableview reload] 中，self.tableview 就是接收者，reload 就是消息，所以方法调用的格式在编译器看来是 [receiver message]。
+
+    其中接收者如何响应代码，就发生在运行时（runtime）。runtime 执行的是编译后的代码，这时它可以动态加载对象、添加方法、修改属性、传递信息等等，runtime 的运行机制就是 Objective-C 的动态特性。
+
+    Swift 目前被公认为是一门静态语言。它的动态特性都是通过桥接 OC 来实现。
+
+39. **objc_msgSend() 如果找不到对象，会如何进行后续处理？**
+    1. 消息接收者（对象）为 nil，在 runtime 中不会产生任何效果。
+    2. 消息（方法）在对象中找不到，程序异常，引发 unrecognized selector。
+
+40. **什么是 method swizzling**
+    - 每个类都维护一个方法列表，其中方法名与其实现是一一对应的关系，即 `SEL`（方法名）和 `IMP`（指向实现的指针）的对应关系。method swizzling 可以在运行时将 SEL 和 IMP 进行更换。
+
+        ```objc
+        // 方法一的 SEL 和 Method SEL
+        SEL oneSEL = @selector(methodOne:);
+        Method oneMethod = class_getInstanceMethod(selfClass, oneSEL);
+
+        // 方法二的 SEL 和 Method
+        SEL twoSEL = @selector(methodTwo:);
+        Method twoMethod = class_getInstanceMethod(selfClass, twoSEL); /
+
+        // 給方法一添加实现，可以避免方法一没有实现
+        BOOL addSucc = class_addMethod(selfClass, oneSEL, method_getImplementation(twoMethod), method_getTypeEncoding(twoMethod));
+
+        if (addSucc) { 
+            //添加成功：将方法一的实现替换到方法二
+            class_replaceMethod(selfClass, twoSEL, method_getImplementation(oneMethod), method_getTypeEncoding(oneMethod));
+        } else { 
+            //添加失败：方法一已经有实现，直接将方法一和方法二的实现交换
+            method_exchangeImplementations(oneMethod, twoMethod);
+        }
+        ```
+    - **注意**
+        - 方法交换应该保证唯一性和原子性。唯一性是指应该尽可能在 ＋load 方法中实现，这样可以保证方法一定会调用且不会出现异常。原子性是指使用 dispatch_once 来执行方法交换，这样可以保证只运行一次。
+        - 不要轻易使用 method swizzling。因为动态交换方法实现并没有编译器的安全保证，可能会在运行时造成奇怪的 bug。
+
+41. **Swift 为什么将 String，Array，Dictionary设计成值类型？**
+    要解答这个问题，就要和 Objective-C 中相同的数据结构设计进行比较。Objective-C 中，字符串，数组，字典，皆被设计为引用类型。
+
+    - 值类型相比引用类型，最大的优势在于内存使用的高效。值类型在栈上操作，引用类型在堆上操作。栈上的操作仅仅是单个指针的上下移动，而堆上的操作则牵涉到合并、移位、重新链接等。也就是说 Swift 这样设计，大幅减少了堆上的内存分配和回收的次数。同时 copy-on-write 又将值传递和复制的开销降到了最低。
+
+    - String，Array，Dictionary 设计成值类型，也是为了线程安全考虑。通过 Swift 的 let 设置，使得这些数据达到了真正意义上的“不变”，它也从根本上解决了多线程中内存访问和操作顺序的问题。
 
 ## 设计模式
 
@@ -427,7 +491,9 @@
     - 代理模式
 
 2. MVC 模式
-
+    - M 模型层，保存数据
+    - V 视图层，展示UI效果，展示数据
+    - C 控制器，控制数据如何显示在视图层
 
 
 ## 多线程
