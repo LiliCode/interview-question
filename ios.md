@@ -386,7 +386,36 @@
     4. 变量用 static final + 类型 来修饰，即为全局变量！
     5. final 修饰参数类型，eg:(final Other o)，强制保护对象o不被new...，但其内部数据仍能修改
     6. final 用处一般都只有第三方库才会去用它，对于项目而言 我还没发现除了我 谁还在用 我强烈不建议用
+
+35. ** Swift 将协议（protocol）中的部分方法设计成可选（optional），该怎样实现？**
+    @optional和 @required 是 Objective-C 中特有的关键字。在 Swift 中，默认所有方法在协议中都是必须实现的。而且，协议里方法不可以直接定义 optional。先给出两种解决方案：
     
+    - 在协议和方法前都加上 `@objc` 关键字，然后再在方法前加上 `optional` 关键字。该方法实际上是把协议转化为 Objective-C 的方式然后进行可选定义。示例如下：
+        ```objc
+        @objc protocol SomeProtocol {
+            func requiredFunc()
+            @objc optional func optionalFunc()
+        }
+        ```
+    - 用扩展（extension）来规定可选方法。在 Swift 中，协议扩展（protocol extension）可以定义部分方法的默认实现，这样这些方法在实际调用中就是可选实现的了。示例如下：
+        ```swift
+        protocol SomeProtocol {
+            func requiredFunc()
+            func optionalFunc()
+        }
+
+        extension SomeProtocol {
+            func optionalFunc() {
+                print("Dumb Implementation")
+            }
+        }
+
+        class SomeClass: SomeProtocol {
+            func requiredFunc() {
+                print(“Only need to implement the required”)
+            }
+        }
+        ```
 
 ## 设计模式
 
@@ -798,6 +827,5 @@
     2. 没有对 cell 进行重用，解决办法就是注册cell，从重用队列中获取cell展示到屏幕上
     3. cell 每次展示都重新布局，需要避免每次展示重新布局UI，可以自定义cell，在 awakeFromNib 或者初始化方法中添加 UI 布局，或者使用 XIB 的形式提前画好布局
     4. cell 的高度每次都需要重新计算，影响滑动性能，可以预先计算高度并缓存在内存中，每次 UITableView 代理方法获取高度就从内存中取值。例如使用 `FDTemplateLayoutCell` 计算高度并缓存
-    5. 加载网络数据，下载图片，使用异步加载并缓存，例如使用 `SDWebImage` 框架加载图片
+    5. 加载网络数据，下载图片，使用异步加载并缓存，例如使用 `SDWebImage` 框架加载图片。列表不宜加载分辨率过大的图片，会占用很大的内存空间。
     6. 需要进行大量绘制且消耗CPU资源较多的计算可以放入后台线程，后台线程计算完成，就交给主线程去展示，这被称作为异步渲染，例如使用 YYLabel 框架做富文本的异步渲染，AsyncDisplayKit 做UI的异步绘制
-
