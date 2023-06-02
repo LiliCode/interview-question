@@ -193,6 +193,8 @@
             1. 实例对象的 isa 指向 class 对象。
             2. class 对象的 isa 指向 meta-class 对象。
             3. meta-class 对象的 isa 指向基类的 meta-class 对象。
+            4. 类对象中的 isa 指向类结构被称作 meta-class，meta-class 存储类的 static 类成员变量与 static 类方法（+ 开头的方法）。
+            5. 实例对象中的 isa 指向类结构称作 class（普通的），class 结构存储类的成员变量与对象方法（- 开头的方法）。
 
         参考地址: https://blog.csdn.net/weixin_38633659/article/details/124544684
 
@@ -212,6 +214,7 @@
     - 分类只能扩展方法，扩展既能扩展属性又能扩展方法
     - 分类扩展的方法外部可见，扩展中的方法和属性都是私有的
     - 分类中添加的方法如果和当前类中的方法一样，则会覆盖掉当前类的中这个方法；
+    - Extension 是在编译后合并到类中。Category 是runtime 运行时 合并到类中。
     
         >**拓展**
         如果分类中声明了一个属性，那么分类只会生成这个属性的 set、get 方法声明，也就是不会有实现，使用这个属性会报错
@@ -253,7 +256,34 @@
 
         上面代码中 `_cmd` 就是当前方法的 `SEL` 指针，这个两个函数需要通过一个 key 去存值和取值，key 是一个 `void *` 无类型指针，所以这里使用当前方法的 SEL 指针最合适不过了（既优雅又实用）。
 
-23. **OC 中调用 Swift 代码**
+23. **分类的底层实现原理**
+    - 分类的作用：为已经存在的类添加方法，使模块化，组件化（不同功能不同的分类）。可以在不修改原来类的基础上，为一个类 扩展方法。 最主要的应用：给系统自带的类扩展方法。
+    - 底层原理
+        Category 的本质是一个 `_category_t` 结构体，其结构如下：
+
+        ```c
+        struct _category_t {
+            const char *name;       // 名称
+            struct _class_t *cls;   // 类 
+            const struct _method_list *instance_methods;    // 对象方法列表
+            const struct _method_list *class_methods;       // 类方法列表
+            const struct _protocol_list_t *protocols;       // 协议列表
+            const struct _prop_list_t *properties;          // 属性列表
+        }
+        ```
+    - Categroy 的加载过程 
+        1. 在编译时只是一个包含**类名**，**类指针**，**方法列表**，**属性列表**，**协议列表**的_category_t结构体；
+
+        2. 在运行时通过 runtime 加载分类数据，把分类的方法、属性、协议数据合并到一个大数组中，后参与编译的分类会在数组的前面(i–倒数遍历数组添加的)（这也说明了分类中相同的方法后参与编译的分类会被调用）；
+
+        3. 合并后的分类数据会插入到原来类数据的前面（相同的方法，分类会优先于原来调用）。
+
+        4. 编译顺序是可以手动设置的：TARGETS->BuildPhases->Complle Sources。（自己可以验证一下，这里不再赘述）
+
+    参考资料：https://zhuanlan.zhihu.com/p/104833029
+
+
+24. **OC 中调用 Swift 代码**
     1. Swift 类必须继承 NSObject 类，并且 class 关键字前面必须加上 `@objc` 或者 `@objcMembers`
         >**注意**
         class 前面使用 @objc ，在对应的方法或者属性也需要使用 @objc，而 @objcMembers 则不需要
@@ -263,23 +293,23 @@
     在 Swift 中，继承自 NSObject 的类如果有比较多的属性或方法都需要加上 `@objc` 的话，会多比较多的代码。那么可以利用 `@objcMembers` 减少代码。被 `@objcMembers` 修饰的类，会默认为类、子类、类扩展和子类扩展的所有属性和方法都加上 @objc 。当然如果想让某一个扩展关闭 @objc，则可以用 `@nonobjc` 进行修饰。
 
 
-24. **@objc 与 @objcMembers 的区别**
+25. **@objc 与 @objcMembers 的区别**
     - 在Swift中，继承自 NSObject 的类如果有比较多的属性或方法都需要加上 `@objc` 的话，会多比较多的代码。那么可以利用 `@objcMembers` 减少代码。
     - 被 @objcMembers 修饰的类，会默认为类、子类、类扩展和子类扩展的所有属性和方法都加上 @objc。
     - 如果想让某一个扩展关闭 @objc，则可以用 `@nonobjc` 进行修饰。
 
-25. **自动释放池**
+26. **自动释放池**
     - release 可能会导致对象立即释放，如果频繁对对象进行 release，可能会造成琐碎的内存管理负担。autorelease 可以将release 的调用延迟到自动释放池被释放时。
     - 推荐使用自动释放池（Autorelease Pool）Block，当期结束时，所有接受autorelease消息的对象将会被立即释放（即发送 release 消息）
     - AppKit 和UIKit 框架在处理每一次事件循环迭代时，都会将其放入一个 Autorelease Pool 中。大多数情况，开发人员无需处理。
 
-26. **什么时候需要手工管理 Autorelease Pool**
+27. **什么时候需要手工管理 Autorelease Pool**
     - 编写的程序不基于UI框架，如命令行程序
     - 在循环中创建大量临时对象，需要更早地释放，避免临时对象聚集导致内存峰值过大
     - 在主线程之外创建新的线程，在新线程开始执行处，需要创建自己的 Autorelease Pool
     - 可以嵌套使用 Autorelease Pool
 
-27. **Swift String 和 NSString 的区别**
+28. **Swift String 和 NSString 的区别**
     String 保留了大部分 NSString 的 API，但是 String 的总体功能来看还是比NSString要更加强大，下面总结了几点区别:
 
     - String 是值类型，NSString 是引用类型。
@@ -307,20 +337,20 @@
             print(value)
         }
         ``` 
-28. **代理和 block 传值的优缺点**
+29. **代理和 block 传值的优缺点**
     - block 的代码可读性更好。因为应用 block 和实现 block 的地方在一起。代理的声明和实现是分开在两个类中。代理使用起来也更麻烦，因为要声明协议、声明代理、遵守协议、实现协议里的方法。block不需要声明，也不需要遵守，只需要声明和实现就可以了。
     - block 是一种轻量级的回调，可以直接访问上下文，由于 block 的代码是内联的，运行效率更高。block 就是一个对象，实现了匿名函数的功能。所以我们可以把block当做一个成员变量、属性、参数使用，使用起来非常灵活。
     - blcok的运行成本高。block出栈需要将使用的数据从栈内存拷贝到堆内存，当然对象的话就是引用计数加1，使用完或者block置nil后才销毁。delegate 只是保存了一个对象指针(一定要用week修饰delegate，不然也会循环引用)，直接回调，没有额外消耗。就像C的函数指针，只多做了一个查表动作。
     - block容易造成循环引用，而且不易察觉。因为为了 blcok 不被系统回收，所以我们都用 copy 关键字修饰，实行强引用。block 对捕的变量也都是强引用，所以就会造成循环引用。
 
-29. **Swift 构造器**
+30. **Swift 构造器**
     - 在创建某个类的时候调用，构造器中做一些初始化错操作。
 
-29. **Swift 便利构造器**
+31. **Swift 便利构造器**
     - 使用 convenience 声明的构造函数
     - 你应当只在必要的时候为类提供便利构造器，比方说某种情况下通过使用便利构造器来快捷调用某个指定构造器，能够节省更多开发时间并让类的构造过程更清晰明了。
 
-30. **Swift 类类型的构造器代理**
+32. **Swift 类类型的构造器代理**
     - 指定构造器必须调用其直接父类的的指定构造器。
     - 便利构造器必须调用同类中定义的其它构造器（其他便利构造器或者指定构造器）。
     - 便利构造器最后必须调用指定构造器。
@@ -328,7 +358,7 @@
     >**提示**
     指定构造器必须总是向上代理，便利构造器必须总是横向代理
 
-31. **inout 输入输出参数**
+33. **inout 输入输出参数**
     - 为函数参数添加 `inout` 修饰，则可以在函数内部修改外面传进来的值，类似于指针，传值的时候使用 `&`。
     ```swift
     func update(value: inout Int) {
@@ -342,7 +372,7 @@
     ```
     输出：count is 1
 
-32. **Swift 的访问级别**
+34. **Swift 的访问级别**
     - `open` 和 `public` 级别可以让实体被同一模块源文件中的所有实体访问，在模块外也可以通过导入该模块来访问源文件里的所有实体。通常情况下，你会使用 open 或 public 级别来指定框架的外部接口。open 和 public 的区别在后面会提到。
     - `internal` 级别让实体被同一模块源文件中的任何实体访问，但是不能被模块外的实体访问。通常情况下，如果某个接口只在应用程序或框架内部使用，就可以将其设置为 internal 级别。
     - `fileprivate` 限制实体只能在其定义的文件内部访问。如果功能的部分实现细节只需要在文件内使用时，可以使用 fileprivate 来将其隐藏。
@@ -377,9 +407,9 @@
         - 在同一模块中，你可以在符合当前访问级别的条件下重写任意类成员（方法、属性、构造器、下标等）。在不同模块中，你可以重写类中被 open 修饰的成员。
         - 可以通过重写给所继承类的成员提供更高的访问级别。
 
-33. **Swift 中结构体和枚举如何修改属性**
+35. **Swift 中结构体和枚举如何修改属性**
     - 在结构体和枚举中，虽然结构体和枚举可以定义自己的方法，但是默认情况下，实例方法中是不可以修改值类型的属性。为了能够在实例方法中修改属性值，可以在方法定义前添加关键字 `mutating`。
-34. **Swift 中的 final 关键字**
+36. **Swift 中的 final 关键字**
     1. final 修饰类，这个类就不能被继承； 如：String类、StringBuffer类、System 类等
     2. final 修饰方法，不能被重写； 如：Object类的 getClass()
     3. final 修饰属性，变为常量属性(没有默认初始化的值)；习惯上，常量用大写字符来写！final 常量一旦确定后，就禁止再次复制！
@@ -387,7 +417,7 @@
     5. final 修饰参数类型，eg:(final Other o)，强制保护对象o不被new...，但其内部数据仍能修改
     6. final 用处一般都只有第三方库才会去用它，对于项目而言 我还没发现除了我 谁还在用 我强烈不建议用
 
-35. ** Swift 将协议（protocol）中的部分方法设计成可选（optional），该怎样实现？**
+37. ** Swift 将协议（protocol）中的部分方法设计成可选（optional），该怎样实现？**
     @optional和 @required 是 Objective-C 中特有的关键字。在 Swift 中，默认所有方法在协议中都是必须实现的。而且，协议里方法不可以直接定义 optional。先给出两种解决方案：
     
     - 在协议和方法前都加上 `@objc` 关键字，然后再在方法前加上 `optional` 关键字。该方法实际上是把协议转化为 Objective-C 的方式然后进行可选定义。示例如下：
@@ -416,19 +446,19 @@
             }
         }
         ```
-36. **Swift 和 Objective-C 中的初始化方法（init）有什么异同？**
+38. **Swift 和 Objective-C 中的初始化方法（init）有什么异同？**
     简而言之，在 Swift 中的初始化方法更加严格和准确。
 
     - Objective-C 中，初始化方法无法保证所有成员变量都完成初始化；编译器对属性设置并无警告，但是实际操作中会出现初始化不完全的问题；初始化方法与普通方法并无实际差别，可以多次调用。
 
     - 在 Swift 中，初始化方法必须保证所有非 optional 的成员变量都完成初始化。同时新增 `convenience` 和 `required` 两个修饰初始化方法的关键词。convenience 只是提供一种方便的初始化方法，必须通过调用同一个类中 designated 初始化方法来完成。required 是强制子类重写父类中所修饰的初始化方法。
-37. **Swift 和 Objective-C 中的协议（Protocol）有什么异同？**
+39. **Swift 和 Objective-C 中的协议（Protocol）有什么异同？**
     - 相同点在于，Swift 和 Objective-C 中的 Protocol 都可以被用作代理。Objective-C 中的 Protocol 类似于 Java 中的 Interface，实际开发中主要用于适配器模式（Adapter Pattern，详见第3章第4节设计模式）。
 
     - 不同点在于，Swift 的 Protocol 还可以对接口进行抽象，例如 Sequence，配合拓展（extension）、泛型、关联类型等可以实现面向协议的编程，从而大大提高整个代码的灵活性。同时 Swift 的 Protocol 还可以用于值类型，如结构体和枚举。
     - Objective-C 中的协议方法可以设置成可选实现或者必须实现，Swift 中的协议方法是必须实现，如果想要设置成可选请参照第35条问题
 
-38. **谈谈对 Objective-C 和 Swift 动态特性的理解**
+40. **谈谈对 Objective-C 和 Swift 动态特性的理解**
     runtime 其实就是 Objective-C 的动态机制。runtime 执行的是编译后的代码，这时它可以动态加载对象、添加方法、修改属性、传递信息等等。具体过程是在 Objective-C 中对象调用方法时，如 [self.tableview reload]，发生了两件事。
 
     1. 编译阶段，编译器（compiler）会把这句话翻译成 objc_msgSend(self.tableview,[@selector](https://xiaozhuanlan.com/u/undefined)(reload))，把消息发送给 self.tableview。
@@ -443,11 +473,11 @@
 
     Swift 目前被公认为是一门静态语言。它的动态特性都是通过桥接 OC 来实现。
 
-39. **objc_msgSend() 如果找不到对象，会如何进行后续处理？**
+41. **objc_msgSend() 如果找不到对象，会如何进行后续处理？**
     1. 消息接收者（对象）为 nil，在 runtime 中不会产生任何效果。
     2. 消息（方法）在对象中找不到，程序异常，引发 unrecognized selector。
 
-40. **什么是 method swizzling**
+42. **什么是 method swizzling**
     - 每个类都维护一个方法列表，其中方法名与其实现是一一对应的关系，即 `SEL`（方法名）和 `IMP`（指向实现的指针）的对应关系。method swizzling 可以在运行时将 SEL 和 IMP 进行更换。
 
         ```objc
@@ -474,7 +504,7 @@
         - 方法交换应该保证唯一性和原子性。唯一性是指应该尽可能在 ＋load 方法中实现，这样可以保证方法一定会调用且不会出现异常。原子性是指使用 dispatch_once 来执行方法交换，这样可以保证只运行一次。
         - 不要轻易使用 method swizzling。因为动态交换方法实现并没有编译器的安全保证，可能会在运行时造成奇怪的 bug。
 
-41. **Swift 为什么将 String，Array，Dictionary设计成值类型？**
+43. **Swift 为什么将 String，Array，Dictionary设计成值类型？**
     要解答这个问题，就要和 Objective-C 中相同的数据结构设计进行比较。Objective-C 中，字符串，数组，字典，皆被设计为引用类型。
 
     - 值类型相比引用类型，最大的优势在于内存使用的高效。值类型在栈上操作，引用类型在堆上操作。栈上的操作仅仅是单个指针的上下移动，而堆上的操作则牵涉到合并、移位、重新链接等。也就是说 Swift 这样设计，大幅减少了堆上的内存分配和回收的次数。同时 copy-on-write 又将值传递和复制的开销降到了最低。
