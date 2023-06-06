@@ -84,7 +84,7 @@
     
     - 全局 block 存放在 data 区，类名 `__NSGlobalBlock__`，block 不使用**外部的局部变量**或者只有当block里面仅仅捕获了外部的**静态局部变量**、**全局变量**、**静态全局变量**时就变成全局 block，堆全局 block 做 copy 操作还是全局 block。
     - 栈 block 存放在栈区，类名 `__NSStackBlock__`，使用了外部的局部变量的 block 刚创建出来没有复制给任何变量，也没有做 copy 操作就是栈 block。如果创建出来的 block 使用了外部局部变量，然后将这个 block 赋值给一个使用 `__weak` 修饰的变量，该 block 也是一个栈 block。
-    - 堆 block 存放在堆区，类名 `__NSMallocBlock__`，block 创建出来赋值给一个变量并且使用了外部的变量，或者做了 copy 操作就变成了堆block。
+    - 堆 block 存放在堆区，类名 `__NSMallocBlock__`，block 创建出来赋值给一个强引用或者 copy 修饰的变量并且使用了外部的变量，就变成了堆block。
 
       三种 block 的代码演示如下：
 
