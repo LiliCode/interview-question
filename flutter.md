@@ -2,7 +2,7 @@
 
 ## Dart 语言知识点
 
-
+ 
 
 ## Flutter 知识点
 
@@ -136,8 +136,9 @@
           });
         }
         ```
+
 5. **Isolate**
-  - 所有的 Dart 代码都运行在 Isolate 中。Isolate 有自己私有的内存空间和一个基于事件循环的线程。
+  - 所有的 Dart 代码都运行在 Isolate 中。Isolate 有自己私有的内存空间和一个运行事件循环的独立线程。
   - 大部分 Dart 应用在一个 Isolate 中运行全部代码，也可以根据需要创建更多 Isolate。如果某个操作计算量如此之大以至于它在主 Isolate 运行中会导致掉帧，可以使用 Isolate.spawn() 或Flutter’s compute() function 方法。这些方法都会创建独立的 Isolate 来做密集计算，让主 Isolate 专注重建和渲染 Widget 树。
   - 新创建的 Isolate 有自己的事件循环和内存，原先的 Isolate (即创建新 Isolate 的那个 Isolate) 不能访问这些内存。这种机制正是 Isolate 名字的来源：内存块之间彼此隔离。
   - 事实上，Isolate 之间能协作的唯一方式是消息传递。一个 Isolate 可以向另一个 Isolate 发送消息，接收方在其事件循环处理收到的消息。
@@ -145,3 +146,15 @@
 
   参考资料：https://cloud.tencent.com/developer/article/1860255
 
+6. **Isolate 和鲜线程的区别**
+  - 线程与线程之间是共享内存的，而 isolate 和 isolate 之间是不共享的，所以叫 isolate (隔离)。
+  
+    >**提示**
+      因为 Dart 没有共享内存的并发，没有竞争的可能性所以不需要锁，也就不用担心死锁的问题
+
+7. **Isolate 之间如何传递消息（通信）**
+  - 由于 isolate 之间没有共享内存，所以他们之间的通信唯一方式只能是通过 `Port` 进行，而且 Dart 中的消息传递总是异步的。
+
+  - 通信使用: SendPort、ReceivePort
+
+8. 
