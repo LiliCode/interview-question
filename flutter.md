@@ -210,4 +210,30 @@
     1. 未完成状态，执行 Future 内部的操作时，例如网络请求过程，延时过程，我们称这个过程为未完成状态
     2. 完成状态，当 Future 内部的操作执行完成，通常会返回一个值，或者抛出一个异常。这两种情况，我们都称 Future 为完成状态。
 
-12. 
+12. **BuildContext 是什么**
+  - 根据官方的注释，我们可以知道 BuildContext 实际上就是 `Element` 对象，主要是为了防止开发者直接操作 Element 对象。通过源码我们也可以看到 Element 是实现了 BuildContext 这个抽象类中的接口，那么在当前 Widget 中获取到 context 就可以获取到 Element 的一些信息。如下所示代码：
+
+    ```dart
+    // 系统中 Element 抽象类实现了 BuildContext 抽象类的接口
+    abstract class Element extends DiagnosticableTree implements BuildContext {
+      // 这里是 Element 抽象类的一些代码 ...
+    }
+    ```
+
+  - Element 是 Widget 树中特定位置所对应的实例，Widget 的状态都会保存在 Element 当中。那么 BuildContext 到底能干什么呢？只要是 Element 能做的事情，BuildContext 基本都能做，如：
+
+    ```dart
+    final size = context.size;
+    final render = context.findRenderObject();
+    // 还有很多请自行查阅 BuildContext ....
+    ```
+  - 还可以使用 Element 的 `markNeedsBuild()` 方法刷新状态（不推荐），如下所示
+
+    ```dart
+    (context as Element).markNeedsBuild();
+    ```
+
+    这就是 `setState()` 方法中最核心的代码，在 markNeedsBuild 方法中会将当前 element 标记为 `脏`（_dirty = true），然后会调用 `owner.scheduleBuildFor(this);` 方法执行刷新状态。
+
+    setState 刷新很复杂，请参考: https://juejin.cn/post/7044865304647696391
+
