@@ -26,6 +26,15 @@
     - widget 的重建开销非常小，所以可以随意的重建，因为它不一会导致页面重绘，并且它也不一定会常常变化。 而renderObject如果频繁创建和销毁成本就很高了，对性能的影响比较大，因此它会缓存所有页面元素，只是当这些元素有变化时才去重绘页面。
 
     - 而判断页面有无变化就依靠element了，每次 widget 变化时 element 会比较前后两个 widget，只有当某一个位置的 Widget 和新 Widget 不一致，才会重新创建 Element 和 widget；其他时候则只会修改 RenderObject 的配置而不会进行耗费性能的 RenderObject 的实例化工作了。
+  
+  - 三棵树的作用
+    - 简而言之是为了性能，为了复用 Element 从而减少频繁创建和销毁 RenderObject。因为实例化一个 RenderObject 的成本是很高的，频繁的实例化和销毁 RenderObject 对性能的影响比较大，所以当 Widget 树改变的时候，Flutter 使用 Element 树来比较新的 Widget 树和原来的 Widget 树。
+
+    - 如果某一个位置的 Widget 和新 Widget 不一致，才需要重新创建 Element；
+    如果某一个位置的 Widget 和新 Widget 一致时(两个 widget 相等或 runtimeType 与 key 相等)，则只需要修改 RenderObject 的配置，不用进行耗费性能的 RenderObject 的实例化工作了；
+    因为 Widget 是非常轻量级的，实例化耗费的性能很少，所以它是描述APP的状态（也就是configuration）的最好工具；
+    重量级的 RenderObject（创建十分耗费性能）则需要尽可能少的创建，并尽可能的复用；
+
 
     >**参考资料**
     https://blog.csdn.net/jdsjlzx/article/details/125397397
