@@ -237,3 +237,46 @@
 
     setState 刷新很复杂，请参考: https://juejin.cn/post/7044865304647696391
 
+13. **Flutter 布局的核心机制**
+  - Flutter 布局的核心机制是 `widgets`。在 Flutter 中，几乎所有东西都是 widget，甚至布局模型都是 widgets。你在 Flutter 应用程序中看到的图像，图标和文本都是 widgets。此外不能直接看到的也是 widgets，例如用来排列、限制和对齐可见 widgets 的行、列和网格。
+
+14. **松约束和紧约束**
+  - 松约束：约束最小值为 0 `minWidth 和 minHeight` 的约束
+  - 紧约束：约束最小值不为 0，最小值和最大值相同
+  - 如果约束最小值为 0，切最大值也为 0，这个约束同时是松约束和紧约束
+
+    例如：Center 就是松约束组件，值的范围 0.0 >= w <= max
+
+  - 约束最大值没有指定就是`无界（unbounded）`，指定了约束最大值就是`有界（bounded）`
+
+  使用 `LayoutBuilder` 组件查看当前的约束，使用 `ConstrainedBox` 组件精准的设置约束
+
+15. **Column 布局的步骤**
+  - 先布局没有弹性的组件，然后再布局有弹性的组件
+
+    ```dart
+    Column(
+      children: [
+        const SizedBox(height: 10,),
+        ListView(
+          children: [
+            for (var i = 0; i < 10; i++)
+              Text('测试数据 $i'),
+          ],
+        ),
+        const SizedBox(height: 20,),
+      ],
+    )
+    ```
+    上述代码在布局的时候，ListView 没有指定大小，会默认为无边界，所以 Column 在布局的时候会发现 ListView 无法布局，所以就会报错。Column 的高度减去 ListView 的高度是一个负数，ListView 的高度为 `double.infinity`。
+
+    可以在 ListView 包裹一层弹性布局，例如: `Expanded` 或者 `Flexible`，这两个弹性组件会充满 Column 剩余的空间，所以 ListView 的尺寸就得到了自适应。
+
+16. **MainAxisAlignment 枚举的含义**
+  这是一个 Column 或者 Row 组件中布局用到的主轴排列方式
+
+  1. spaceEvenly: 平均分陪剩下的空间
+  2. spaceBetween: 把剩余的空间插入中间的组件当中，两边没有空间
+  3. spaceAround: 每个组件左右或者上下都有相等的空间
+
+  
