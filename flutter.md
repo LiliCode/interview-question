@@ -158,11 +158,60 @@
         ```
 
 5. **Isolate**
-  - 所有的 Dart 代码都运行在 Isolate 中。Isolate 有自己私有的内存空间和一个运行事件循环的独立线程。
-  - 大部分 Dart 应用在一个 Isolate 中运行全部代码，也可以根据需要创建更多 Isolate。如果某个操作计算量如此之大以至于它在主 Isolate 运行中会导致掉帧，可以使用 Isolate.spawn() 或Flutter’s compute() function 方法。这些方法都会创建独立的 Isolate 来做密集计算，让主 Isolate 专注重建和渲染 Widget 树。
-  - 新创建的 Isolate 有自己的事件循环和内存，原先的 Isolate (即创建新 Isolate 的那个 Isolate) 不能访问这些内存。这种机制正是 Isolate 名字的来源：内存块之间彼此隔离。
-  - 事实上，Isolate 之间能协作的唯一方式是消息传递。一个 Isolate 可以向另一个 Isolate 发送消息，接收方在其事件循环处理收到的消息。
-  - Isolate 中内存分配和垃圾回收不需要锁定。Isolate 中只有一个线程，如果它不是很忙的话，内存并不会快速变化，所以不必锁定。这非常适合 Flutter 应用，它时常要迅速地构建和销毁 Widget 树。
+  - Isolate 的一些特性
+    1. 所有的 Dart 代码都运行在 Isolate 中。Isolate 有自己私有的内存空间和一个运行事件循环的独立线程。
+    2. 大部分 Dart 应用在一个 Isolate 中运行全部代码，也可以根据需要创建更多 Isolate。如果某个操作计算量如此之大以至于它在主 Isolate 运行中会导致掉帧，可以使用 Isolate.spawn() 或Flutter’s compute() function 方法。这些方法都会创建独立的 Isolate 来做密集计算，让主 Isolate 专注重建和渲染 Widget 树。
+    3. 新创建的 Isolate 有自己的事件循环和内存，原先的 Isolate (即创建新 Isolate 的那个 Isolate) 不能访问这些内存。这种机制正是 Isolate 名字的来源：内存块之间彼此隔离。
+    4. 事实上，Isolate 之间能协作的唯一方式是消息传递。一个 Isolate 可以向另一个 Isolate 发送消息，接收方在其事件循环处理收到的消息。
+    5. Isolate 中内存分配和垃圾回收不需要锁定。Isolate 中只有一个线程，如果它不是很忙的话，内存并不会快速变化，所以不必锁定。这非常适合 Flutter 应用，它时常要迅速地构建和销毁 Widget 树。
+  
+  - Isolate 的使用场景
+    1. 在一些 CPU 处理密集型的任务场景中可以使用 Isolate 单独处理，例如图片处理，视频音频处理，文件压缩等。
+
+  - Isolate 的基本使用方法:
+
+    1. 使用 `Isolate.spawn` 创建 isolate
+      ```dart
+      void performWorker() async {
+        // 创建一个接收消息的 port
+        final receivePort = ReceivePort();
+        // 使用 spawn 创建一个 isolate，传入一个需要在线程中传出消息的 port
+        final isolate = await Isolate.spawn((sendPort) {
+          // 这个回掉中执行耗时操作
+          Future.delayed(const Duration(seconds: 1), () {
+            sendPort.send('哈哈哈，延时一秒钟');
+          });
+        }, receivePort.sendPort);
+
+        // 监听耗时操作的结果
+        receivePort.listen((message) {
+          print('接收到的消息: $message');
+
+          // 关闭 port
+          receivePort.close();
+          // 销毁 isolate
+          isolate.kill();
+        });
+      }
+      ```
+
+    2. 使用 `compute` 函数创建 isolate
+
+      ```dart
+      void performWorker() async {
+        // 创建一个 isolate，在回掉函数中执行耗时操作并返回结果
+        // 第一个泛型参数是回掉函数的参数类型
+        // 第二个泛型参数是返回值结果的类型
+        final result = await compute<String, int>((message) async {
+          await Future.delayed(const Duration(seconds: 1));
+          return 1000;
+        }, 'https://user/id');
+        // 使用结果
+        print('result is $result');
+      }
+      ```
+    上述两种方式中，`spawn` 方法创建的 isolate 功能更多，可以实现自定义；使用 `compute` 创建的 isolate 使用非常简单，适合功能单一的场景。
+    
 
   参考资料：https://cloud.tencent.com/developer/article/1860255
   参考资料: https://ducafecat.com/blog/flutter-isolate
