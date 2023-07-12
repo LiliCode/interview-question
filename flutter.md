@@ -13,12 +13,14 @@
       存放渲染内容、它只是一个配置数据结构，创建是非常轻量的，在页面刷新的过程中随时会重建
 
     - Element Tree 元素树
-      是分离 WidgetTree 和真正的渲染对象的中间层， WidgetTree 用来描述对应的Element 属性,同时持有Widget和RenderObject，存放上下文信息，通过它来遍历视图树，支撑UI结构。
+      是分离 WidgetTree 和真正的渲染对象的中间层， WidgetTree 用来描述对应的Element 属性, 同时持有 Widget 和 RenderObject，存放上下文信息，通过它来遍历视图树，支撑UI结构。
 
     - RenderObject 渲染树
       用于应用界面的布局和绘制，负责真正的渲染，保存了元素的大小，布局等信息，实例化一个 RenderObject 是非常耗能的
 
     - 流程: 当应用启动时 Flutter 会遍历并创建所有的 Widget 形成 Widget Tree，通过调用 Widget 上的 `createElement()` 方法创建每个 `Element` 对象，形成 Element Tree。最后调用 Element 的 `createRenderObject()` 方法创建每个渲染对象，形成一个 Render Tree。
+    - Flutter UI 的渲染流程如下图所示
+     ![](./assets/flutter-render.jpg)
 
   - flutter为什么要设计成这样呢？为什么要弄成复杂的三层结构？
     - 答案是性能优化。如果每一点细微的操作就去完全重绘一遍UI，将带来极大的性能开销。flutter 的三棵树型模式设计可以有效地带来性能提升。
@@ -38,6 +40,15 @@
 
     >**参考资料**
     https://blog.csdn.net/jdsjlzx/article/details/125397397
+  
+  - Element 的生命周期
+    1. `Mount` 挂载，元素第一次被添加到元素树上的时候就会调用
+    2. `Active` 激活之前失活的元素时调用
+    3. `Update` 用新数据去更新 RenderObject 的时候调用
+    4. `Deactive` 当元素从树中移除或者移动时会被调用。如果一个元素在在同一帧期间被移动了并且设置了 GlobalKey，那么它任然能被激活
+    5. `Unmount` 卸载，如果元素在某一帧期间没有被激活，将会被卸载，并且不会再复用
+
+    >提示：如果需要做性能优化，你需要尽可能的让元素使用 `Active` 和 `Update` 操作，并且尽量避免元素出发 `Mount` 和 `Unmount` 操作，使用 GlobalKey 和 Valuekey 可以做到这一点。
 
 2. **StatefulWidget 的生命周期**
   - 如下图所示
@@ -154,6 +165,7 @@
   - Isolate 中内存分配和垃圾回收不需要锁定。Isolate 中只有一个线程，如果它不是很忙的话，内存并不会快速变化，所以不必锁定。这非常适合 Flutter 应用，它时常要迅速地构建和销毁 Widget 树。
 
   参考资料：https://cloud.tencent.com/developer/article/1860255
+  参考资料: https://ducafecat.com/blog/flutter-isolate
 
 6. **Isolate 和鲜线程的区别**
   - 线程与线程之间是共享内存的，而 isolate 和 isolate 之间是不共享的，所以叫 isolate (隔离)。
@@ -279,4 +291,56 @@
   2. spaceBetween: 把剩余的空间插入中间的组件当中，两边没有空间
   3. spaceAround: 每个组件左右或者上下都有相等的空间
 
-  
+17. **Flutter 布局约束的规则**
+  - 首先：上层 widget 向下层 widget 传递约束条件
+  - 然后：下层 widget 向上层 widget 传递大小信息
+  - 最后：上层 widget 决定下层 widget 的位置。
+
+18. **Stack 布局的规则**
+  - Stack 优先布局没有位置的组件，Stack 的大小由没有位置的组件中最大的一个组件决定，然后在布局有定位的组件（使用 Positioned 包裹的组件）。
+  - 如果 Stack 中全是 Positioned 定位组件，Stack 的尺寸就是最大。
+
+  - Stack 中的 `fit` 属性：
+    1. `StackFit.loose` 将父组件的约束变宽松，让子组件的尺寸在自己的范围内变化
+    2. `StackFit.expand` 将 Stack 组件的尺寸变得和父组件一样大
+    3. `StackFit.passthrough` 直接让 Stack 的父组件的约束传递给 Stack 的子组件
+  - clipBehavior 属性，默认 `hardEdge`，溢出就裁切边沿部分，可以设置成 `Clip.none` 不裁切
+
+19. **Container 的默认尺寸**
+
+    1. 不存在 child 的情况，首先在结合父组件传递的约束和 Container 自身的width, height, constraints 属性计算约束
+      - 如果计算出来的约束时有界的，则尽量占满
+      - 如果计算出来的约束时无界的，则尽量缩小 常见的无边界的组件有 Row(水平无边界) 和 Column(垂直无边界)
+
+    2. 存在 child 的情况，首先将父组件传递的约束和 Container 自身的width, height, constraints 约束传递给子组件，子组件可以确定自身的尺寸
+      - 如果没有设置对齐（alignment）方式的请情况下，Container 会尽可能的小，以便匹配 child 的尺寸
+      - 如果设置了对齐（alignment）方式，但是某个纬度的约束无界，Container 还是在会无界约束的维度尽可能的小，以便匹配 child 的尺寸
+      - 如果设置了对齐（alignment）方式，约束是有界的，Container 会尽可能的放大，为对齐方式创造条件
+      
+20. **Container 的本质**
+  - Container 是一个结合了尺寸，形状，背景颜色，间距，留白，约束，装饰等功能于一身的组件，以属性的方式设置对应的值，这样就不需要层层嵌套。
+
+  - Container 中各种属性所对应的组件：
+    - 存在 padding、margin 就会将 child 包裹一层 `Padding` 组件
+    - 存在 alignment 就包裹一层 `Align` 组件
+    - 存在 color 就包裹一层 `ColoredBox` 组件
+    - 存在 clipBehavior 就包裹一层 `ClipPath` 组件
+    - 存在 decration、foregroundDecoration 就包裹一层 `DecoratedBox` 组件
+    - 存在 constraints 就包裹一层 `ConstrainedBox` 组件
+    - 存在 transform 就包裹一层 `Transform` 组件
+
+21. **LimitedBox 是什么**
+  - 当其自身不受约束时才限制其大小的盒子。
+  - 如果受到了约束限制，其中的 maxWidth 和 maxHeight 不起作用。
+
+  - 例如在 Container 的源代码 build 方法中，可以看到当 Container 没有子组件并且没有设置约束或者不是紧约束，就展示一个 LmitedBox，代码如下:
+      ```dart
+      if (child == null && (constraints == null || !constraints!.isTight)) {
+        current = LimitedBox(
+          maxWidth: 0.0,
+          maxHeight: 0.0,
+          child: ConstrainedBox(constraints: const BoxConstraints.expand()),
+        );
+      }
+      ```
+    上述代码中，LimitedBox 收到约束影响，maxWidth、maxHeight 就不起作用，就会展示 child 的 ConstrainedBox 组件，ConstrainedBox 组件的约束是 expand，expand 方法中默认值是 double.infinity，此时 child 就会充满父组件。
