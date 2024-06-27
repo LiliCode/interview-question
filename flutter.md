@@ -21,6 +21,8 @@
     - 流程: 当应用启动时 Flutter 会遍历并创建所有的 Widget 形成 Widget Tree，通过调用 Widget 上的 `createElement()` 方法创建每个 `Element` 对象，形成 Element Tree。最后调用 Element 的 `createRenderObject()` 方法创建每个渲染对象，形成一个 Render Tree。
     - Flutter UI 的渲染流程如下图所示
      ![](./assets/flutter-render.jpg)
+    
+    - Widget 和 Element 是一一对应的关系，每创建一个 Widget 都会自动创建一个 Element 实例；但是每个 Widget 不一定都会创建 RenderObject，只有继承自 `RenderObjectWidget` 的 Widget 并且实现了 `createRenderObject()` 方法才会创建 RenderObject。
 
   - flutter为什么要设计成这样呢？为什么要弄成复杂的三层结构？
     - 答案是性能优化。如果每一点细微的操作就去完全重绘一遍UI，将带来极大的性能开销。flutter 的三棵树型模式设计可以有效地带来性能提升。
@@ -242,6 +244,8 @@
     1. `MethodChannel` 用于传递方法调用（method invocation）通常用来调用 native 中某个方法。
     2. `BasicMessageChannel` 用于传递字符串和半结构化的信息，这个用的比较少。
     3. `EventChannel` 用于数据流（event streams）的通信。有监听功能，比如电量变化之后直接推送数据给 flutter 端。
+
+    >注意：`MethodChannel` 是单向通信，只能是 Flutter 层面向原生层面发送消息；`BasicMessageChannel`、`EventChannel` 是双向通信
 
     参考资料： https://juejin.cn/post/7035211019618091045
 
