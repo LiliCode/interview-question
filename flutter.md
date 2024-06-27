@@ -50,8 +50,14 @@
 
     >提示：如果需要做性能优化，你需要尽可能的让元素使用 `Active` 和 `Update` 操作，并且尽量避免元素出发 `Mount` 和 `Unmount` 操作，使用 GlobalKey 和 Valuekey 可以做到这一点。
 
-2. **StatefulWidget 的生命周期**
-  - 如下图所示
+2. **组件的生命周期**
+
+  - StatelessWidget 的生命周期
+
+    1. 构造函数
+    2. build 函数
+
+  - StatefulWidget 的生命周期如下图所示
     ![](./assets/stateful-widget-life-cycle.PNG)
 
 3. **Flutter App 的生命周期**
