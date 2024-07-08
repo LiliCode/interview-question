@@ -10,13 +10,14 @@
 
   - 三棵树简介
     - Widget Tree 部件树
-      存放渲染内容、它只是一个配置数据结构，创建是非常轻量的，在页面刷新的过程中随时会重建
+      Flutter 框架中，一切都是 Widget，当 UI 需要发生变化时，框架不会去直接修改渲染对象，而是通过状态更新，让框架通过状态的变化来更新 UI。
+      Widget 树存放渲染内容、它只是一个配置数据结构，创建是非常轻量的，在页面刷新的过程中随时会重建
 
     - Element Tree 元素树
-      是分离 WidgetTree 和真正的渲染对象的中间层， WidgetTree 用来描述对应的Element 属性, 同时持有 Widget 和 RenderObject，存放上下文信息，通过它来遍历视图树，支撑UI结构。
+      是分离 WidgetTree 和真正的渲染对象的中间层， 存放视图构建的上下文信息, 同时持有 Widget 和 RenderObject，通过它来遍历视图树，支撑UI结构。
 
     - RenderObject 渲染树
-      用于应用界面的布局和绘制，负责真正的渲染，保存了元素的大小，布局等信息，实例化一个 RenderObject 是非常耗能的
+      用于应用界面的`布局`和`绘制`，负责真正的渲染，确定 Element 的大小，布局等信息，实例化一个 RenderObject 是非常耗能的
 
     - 流程: 当应用启动时 Flutter 会遍历并创建所有的 Widget 形成 Widget Tree，通过调用 Widget 上的 `createElement()` 方法创建每个 `Element` 对象，形成 Element Tree。最后调用 Element 的 `createRenderObject()` 方法创建每个渲染对象，形成一个 Render Tree。
     - Flutter UI 的渲染流程如下图所示
@@ -35,15 +36,22 @@
     - 简而言之是为了性能，为了复用 Element 从而减少频繁创建和销毁 RenderObject。因为实例化一个 RenderObject 的成本是很高的，频繁的实例化和销毁 RenderObject 对性能的影响比较大，所以当 Widget 树改变的时候，Flutter 使用 Element 树来比较新的 Widget 树和原来的 Widget 树。
 
     - 如果某一个位置的 Widget 和新 Widget 不一致，才需要重新创建 Element；
-    如果某一个位置的 Widget 和新 Widget 一致时(两个 widget 相等或 runtimeType 与 key 相等)，则只需要修改 RenderObject 的配置，不用进行耗费性能的 RenderObject 的实例化工作了；
-    因为 Widget 是非常轻量级的，实例化耗费的性能很少，所以它是描述APP的状态（也就是configuration）的最好工具；
+    如果某一个位置的 Widget 和新 Widget `runtimeType` 与 `key` 同时相等就会用新的 Widget 去更新 Element 的配置，否则就会创建新的 Element；
+    Widget 是非常轻量级的，实例化耗费的性能很少，所以它是描述APP的状态（也就是configuration）的最好工具；
     重量级的 RenderObject（创建十分耗费性能）则需要尽可能少的创建，并尽可能的复用；
-
 
     >**参考资料**
     https://blog.csdn.net/jdsjlzx/article/details/125397397
-  
-  - Element 的生命周期
+
+  - Element 的生命周期的描述
+
+    - framework 通过 Widget.createElement 来创建一个 Element
+    - 每当 Widget 创建并插入到 Widget 树中时，framework 就会通过 mount 方法来把这个 widget 创建并关联的 Element 插入到 Element 树中
+    - 通过 attachRenderObject 方法来将 render objects 来关联到 Render 树上，这时可以认为 Widget 已经显示在屏幕上了
+    - 每当执行了 rebuid 方法，Widget 代表的配置信息改变时，framewrok 就会调用这个新的 Widget 的 update 方法执行重绘
+    - 当 Element 的祖先想要移除一个子 Element 时，可以通过 deactivateChild 方法，先把这个 Element 从 树中移除，然后将这个 Element 加入到一个“不活跃元素列表”中，接着 framework 就会将这个 element 从屏幕移除
+
+  - Element 的生命周期简述
     1. `Mount` 挂载，元素第一次被添加到元素树上的时候就会调用
     2. `Active` 激活之前失活的元素时调用
     3. `Update` 用新数据去更新 RenderObject 的时候调用
@@ -51,6 +59,23 @@
     5. `Unmount` 卸载，如果元素在某一帧期间没有被激活，将会被卸载，并且不会再复用
 
     >提示：如果需要做性能优化，你需要尽可能的让元素使用 `Active` 和 `Update` 操作，并且尽量避免元素出发 `Mount` 和 `Unmount` 操作，使用 GlobalKey 和 Valuekey 可以做到这一点。
+
+  - Flutter App 启动流程
+
+    1. Flutter 应用的入口在 `lib/main.dart` 的 main() 函数中，它是Dart应用程序的起点。
+      ```dart
+      void main() => runApp(MyApp());
+      ```
+    2. 在 main 函数中会调用 `runApp()` 函数进行绑定根组件，runApp() 方法实现如下
+      ```dart
+      void runApp(Widget app) {
+        WidgetsFlutterBinding.ensureInitialized()
+          ..attachRootWidget(app)
+          ..scheduleWarmUpFrame();
+      }
+      ```
+    3. 然后调用 WidgetsFlutterBinding 的 `ensureInitialized()` 方法负责初始化一个 `WidgetsBinding` 的全局单例，紧接着会调用 WidgetsBinding 的 `attachRootWidget()` 方法，该方法负责将根 Widget 添加到 RenderView 上，当调用完 `attachRootWidget()` 后，最后一行会调用 WidgetsFlutterBinding 实例的 `scheduleWarmUpFrame()` 方法，该方法的实现在 SchedulerBinding 中，它被调用后会立即进行一次绘制，在此次绘制结束前，该方法会锁定事件分发，也就是说在本次绘制结束完成之前 Flutter 将不会响应各种事件，这可以保证在绘制过程中不会再触发新的重绘。
+    
 
 2. **组件的生命周期**
 
