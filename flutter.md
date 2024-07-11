@@ -27,6 +27,8 @@
     
     - Widget 和 Element 是一一对应的关系，每创建一个 Widget 都会自动创建一个 Element 实例；但是每个 Widget 不一定都会创建 RenderObject，只有继承自 `RenderObjectWidget` 的 Widget 并且实现了 `createRenderObject()` 方法才会创建 RenderObject。
 
+    - 所有 RenderObject 的根节点是 `RenderView`，代表了渲染树的总体输出。当平台需要渲染新的一帧内容时（例如一个 vsync 信号或者一个纹理的更新完成），会调用一次 compositeFrame() 方法，它是 RenderView 的一部分。该方法会创建一个 SceneBuilder 来触发当前画面的更新。当画面更新完毕，RenderView 会将合成的画面传递给 dart:ui 中的 Window.render() 方法，控制 GPU 进行渲染。
+
   - flutter为什么要设计成这样呢？为什么要弄成复杂的三层结构？
     - 答案是性能优化。如果每一点细微的操作就去完全重绘一遍UI，将带来极大的性能开销。flutter 的三棵树型模式设计可以有效地带来性能提升。
 
@@ -388,7 +390,7 @@
 
 18. **Stack 布局的规则**
   - Stack 优先布局没有位置的组件，Stack 的大小由没有位置的组件中最大的一个组件决定，然后在布局有定位的组件（使用 Positioned 包裹的组件）。如果同时存在没有位置的组件和使用 Positioned 包裹的位置组件，还是以没有位置组件最大的组件决定 Stack 的大小，即使使用 Positioned.fill 包裹的组件也是以没有位置的最大的组件决定 Stack 的大小，此时 Positioned.fill 的大小就是没有位置最大的组件的大小。
-  
+
   - 如果 Stack 中全是 Positioned 定位组件，Stack 的尺寸就是最大（可能会达到父级组件的大小）。
 
   - Stack 中的 `fit` 属性：
@@ -410,7 +412,7 @@
       - 如果设置了对齐（alignment）方式，约束是有界的，Container 会尽可能的放大，为对齐方式创造条件
       
 20. **Container 的本质**
-  - Container 是一个结合了尺寸，形状，背景颜色，间距，留白，约束，装饰等功能于一身的组件，以属性的方式设置对应的值，这样就不需要层层嵌套。
+  - Container 是一个结合了尺寸，形状，背景颜色，间距，留白，约束，装饰等功能于一身的组件，以属性的方式设置对应的值，这样就不需要层层嵌套。Container 是由 LimitedBox、ColoredBox、 ConstrainedBox、 Align、 Padding、 DecoratedBox 和 Transform 组成的，你也可以通过查看源码看到这些组合。
 
   - Container 中各种属性所对应的组件：
     - 存在 padding、margin 就会将 child 包裹一层 `Padding` 组件
@@ -436,3 +438,19 @@
       }
       ```
     上述代码中，LimitedBox 收到约束影响，maxWidth、maxHeight 就不起作用，就会展示 child 的 ConstrainedBox 组件，ConstrainedBox 组件的约束是 expand，expand 方法中默认值是 double.infinity，此时 child 就会充满父组件。
+
+22. **状态管理的作用，为什么需要状态管理**
+
+    - `数据共享和同步`：在应用程序中，不同部分可能需要共享和同步数据。通过状态管理，可以轻松地在应用程序的各个部分之间共享数据，并确保数据的一致性。
+    - `UI更新`：Flutter 状态管理可以帮助开发者管理应用程序中的UI状态，以便在数据变化时更新用户界面。这样可以确保应用程序的UI与数据的状态保持同步。
+    - `复杂状态管理`：随着应用程序变得越来越复杂，管理应用程序的状态变得更加困难。Flutter状态管理工具可以帮助开发者更有效地管理应用程序的状态，使代码更具可维护性和可扩展性。
+    - `性能优化`：有效的状态管理可以帮助应用程序避免不必要的重绘和重新构建，从而提高应用程序的性能和响应速度。
+    - `代码结构`：通过良好的状态管理，开发者可以更好地组织应用程序的代码结构，使其更易于理解和维护。
+
+23. **Flutter 程序的编译模式**
+
+  1. Release 模式，使用 AOT 编译模式直接生成对应平台（x86、ARM）的机器码，执行效率高，性能好，只支持真机。
+  2. Profile 模式，和 Release 模式类似，只是此模式可以使用 DevTools 来检测性能。
+  3. Debug 模式，使用 JIT 即使编译技术，支持热重载（hot reload）等功能，但是性能没有 Release 模式好。
+
+  

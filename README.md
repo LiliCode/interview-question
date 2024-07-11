@@ -4,6 +4,7 @@
 
 - [iOS 技术知识点](./ios.md)
 - [Flutter 技术知识点](./flutter.md)
+- [Flutter 应用的一些常用优化](./flutter_optimization.md)
 
 一些技术知识网站
 
