@@ -387,13 +387,15 @@
   - 最后：上层 widget 决定下层 widget 的位置。
 
 18. **Stack 布局的规则**
-  - Stack 优先布局没有位置的组件，Stack 的大小由没有位置的组件中最大的一个组件决定，然后在布局有定位的组件（使用 Positioned 包裹的组件）。
-  - 如果 Stack 中全是 Positioned 定位组件，Stack 的尺寸就是最大。
+  - Stack 优先布局没有位置的组件，Stack 的大小由没有位置的组件中最大的一个组件决定，然后在布局有定位的组件（使用 Positioned 包裹的组件）。如果同时存在没有位置的组件和使用 Positioned 包裹的位置组件，还是以没有位置组件最大的组件决定 Stack 的大小，即使使用 Positioned.fill 包裹的组件也是以没有位置的最大的组件决定 Stack 的大小，此时 Positioned.fill 的大小就是没有位置最大的组件的大小。
+  
+  - 如果 Stack 中全是 Positioned 定位组件，Stack 的尺寸就是最大（可能会达到父级组件的大小）。
 
   - Stack 中的 `fit` 属性：
     1. `StackFit.loose` 将父组件的约束变宽松，让子组件的尺寸在自己的范围内变化
     2. `StackFit.expand` 将 Stack 组件的尺寸变得和父组件一样大
     3. `StackFit.passthrough` 直接让 Stack 的父组件的约束传递给 Stack 的子组件
+
   - clipBehavior 属性，默认 `hardEdge`，溢出就裁切边沿部分，可以设置成 `Clip.none` 不裁切
 
 19. **Container 的默认尺寸**
