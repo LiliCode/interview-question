@@ -453,4 +453,7 @@
   2. Profile 模式，和 Release 模式类似，只是此模式可以使用 DevTools 来检测性能。
   3. Debug 模式，使用 JIT 即使编译技术，支持热重载（hot reload）等功能，但是性能没有 Release 模式好。
 
-  
+24. **Flutter 中的 Key 的分类**
+
+    - LocalKey，实现类有 ValueKey、ObjectKey、UniqueKey，LocalKey是一个抽象类，它是 GlobalKey 的基类。它主要用于在当前 Widget 树内唯一标识一个 Widget。
+    - GlobalKey，实现类有 LabeledGlobalKey、GlobalObjectKey，GlobalKey 是全局唯一标识一个 Widget 的 Key。它通常用于在整个应用程序中引用一个 Widget，例如，你可能需要在一个Widget树中的某处访问另一个 Widget 的状态或属性。
