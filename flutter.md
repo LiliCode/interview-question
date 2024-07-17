@@ -1,10 +1,5 @@
 # Flutter 的一些知识点
 
-## Dart 语言知识点
-
-
-## Flutter 知识点
-
 1. **渲染原理**
 
   - 三棵树简介
@@ -137,7 +132,7 @@
 
     参考资料: http://www.ppmy.cn/news/543.html?action=onClick
 
-3. **如何监听路由跳转**
+4. **如何监听路由跳转**
 
   1. 让页面混入 `RouteAware` 这么一个 mixin
   2. 在 `initState()` 或者 `didChangeDependencies()` 中添加订阅监听的代码；在 `dispose()` 中添加移除监听的代码
@@ -166,7 +161,7 @@
       }
       ```
 
-4. **监听 FlutterView 的尺寸变化**
+5. **监听 FlutterView 的尺寸变化**
   - 这个监听常用作监听键盘弹出或隐藏
   - 如何使用
     1. 当前 Widget 混入 一个 mixin `WidgetsBindingObserver`
@@ -194,81 +189,7 @@
         }
         ```
 
-5. **Isolate**
-  - Isolate 的一些特性
-    1. 所有的 Dart 代码都运行在 Isolate 中。Isolate 有自己私有的内存空间和一个运行事件循环的独立线程。
-    2. 大部分 Dart 应用在一个 Isolate 中运行全部代码，也可以根据需要创建更多 Isolate。如果某个操作计算量如此之大以至于它在主 Isolate 运行中会导致掉帧，可以使用 Isolate.spawn() 或Flutter’s compute() function 方法。这些方法都会创建独立的 Isolate 来做密集计算，让主 Isolate 专注重建和渲染 Widget 树。
-    3. 新创建的 Isolate 有自己的事件循环和内存，原先的 Isolate (即创建新 Isolate 的那个 Isolate) 不能访问这些内存。这种机制正是 Isolate 名字的来源：内存块之间彼此隔离。
-    4. 事实上，Isolate 之间能协作的唯一方式是消息传递。一个 Isolate 可以向另一个 Isolate 发送消息，接收方在其事件循环处理收到的消息。
-    5. Isolate 中内存分配和垃圾回收不需要锁定。Isolate 中只有一个线程，如果它不是很忙的话，内存并不会快速变化，所以不必锁定。这非常适合 Flutter 应用，它时常要迅速地构建和销毁 Widget 树。
-  
-  - Isolate 的使用场景
-    1. CPU 处理密集型的任务场景中可以使用 Isolate 单独处理，例如图片处理，视频音频处理，文件压缩等。因为它可以在独立的线程中运行，而不会阻塞UI线程。使用 Future 可能会导致UI线程被阻塞，从而影响应用程序的响应性。
-
-    2. 处理大量数据：如果您需要处理大量的数据，例如从网络获取大型数据集，那么使用 Isolate 可以更好，因为它可以在独立的线程中处理数据，而不会阻塞 UI 线程。使用Future可能会导致 UI 线程被阻塞，从而影响应用程序的响应性。
-
-    3. 并行处理多个任务：如果您需要同时处理多个任务，例如同时下载多个文件或同时处理多个图像，那么使用 Isolate 可以更好，因为它可以在独立的线程中同时处理多个任务，而不会阻塞 UI 线程。使用 Future 可能需要串行处理多个任务，从而导致应用程序的响应性变差。
-
-  - Isolate 的基本使用方法:
-
-    1. 使用 `Isolate.spawn` 创建 isolate
-      ```dart
-      void performWorker() async {
-        // 创建一个接收消息的 port
-        final receivePort = ReceivePort();
-        // 使用 spawn 创建一个 isolate，传入一个需要在线程中传出消息的 port
-        final isolate = await Isolate.spawn((sendPort) {
-          // 这个回掉中执行耗时操作
-          Future.delayed(const Duration(seconds: 1), () {
-            sendPort.send('哈哈哈，延时一秒钟');
-          });
-        }, receivePort.sendPort);
-
-        // 监听耗时操作的结果
-        receivePort.listen((message) {
-          print('接收到的消息: $message');
-
-          // 关闭 port
-          receivePort.close();
-          // 销毁 isolate
-          isolate.kill();
-        });
-      }
-      ```
-
-    2. 使用 `compute` 函数创建 isolate
-
-      ```dart
-      void performWorker() async {
-        // 创建一个 isolate，在回掉函数中执行耗时操作并返回结果
-        // 第一个泛型参数是回掉函数的参数类型
-        // 第二个泛型参数是返回值结果的类型
-        final result = await compute<String, int>((message) async {
-          await Future.delayed(const Duration(seconds: 1));
-          return 1000;
-        }, 'https://user/id');
-        // 使用结果
-        print('result is $result');
-      }
-      ```
-    上述两种方式中，`spawn` 方法创建的 isolate 功能更多，可以实现自定义；使用 `compute` 创建的 isolate 使用非常简单，适合功能单一的场景。
-    
-
-  参考资料：https://cloud.tencent.com/developer/article/1860255
-  参考资料: https://ducafecat.com/blog/flutter-isolate
-
-6. **Isolate 和鲜线程的区别**
-  - 线程与线程之间是共享内存的，而 isolate 和 isolate 之间是不共享的，所以叫 isolate (隔离)。
-  
-    >**提示**
-      因为 Dart 没有共享内存的并发，没有竞争的可能性所以不需要锁，也就不用担心死锁的问题
-
-7. **Isolate 之间如何传递消息（通信）**
-  - 由于 isolate 之间没有共享内存，所以他们之间的通信唯一方式只能是通过 `Port` 进行，而且 Dart 中的消息传递总是异步的。
-
-  - 通信使用: SendPort、ReceivePort
-
-8. **Flutter 中与原生代码交互的三种方式**
+6. **Flutter 中与原生代码交互的三种方式**
 
     1. `MethodChannel` 用于传递方法调用（method invocation）通常用来调用 native 中某个方法。
     2. `BasicMessageChannel` 用于传递字符串和半结构化的信息，这个用的比较少。
@@ -278,43 +199,9 @@
 
     参考资料： https://juejin.cn/post/7035211019618091045
 
-9. **阻塞式调用和非阻塞式调用**
-  - 阻塞和非阻塞关注的是程序在等待调用结果（消息，返回值）时的状态。
-  - 阻塞式调用： 调用结果返回之前，当前线程会被挂起，调用线程只有在得到调用结果之后才会继续执行。
-  - 非阻塞式调用： 调用执行之后，当前线程不会停止执行，只需要过一段时间来检查一下有没有结果返回即可。
 
-10. **Dart 事件循环**
-  单线程模型中主要就是在维护着一个事件循环（Event Loop）。
 
-  1. 事件循环基本原理
-    就是将需要处理的一系列事件（包括点击事件、IO事件、网络事件）放在一个事件队列（Event Queue）中。不断的从事件队列（Event Queue）中取出事件，并执行其对应需要执行的代码块，直到事件队列清空位置。
-  2. 我们来写一个事件循环的伪代码：
-
-      ```dart
-      // 这里我使用数组模拟队列, 先进先出的原则
-      List eventQueue = []; 
-      var event;
-
-      // 事件循环从启动的一刻，永远在执行
-      while (true) {
-        if (eventQueue.length > 0) {
-          // 取出一个事件
-          event = eventQueue.removeAt(0);
-          // 执行该事件
-          event();
-        }
-      }
-      ```
-
-      当我们有一些事件时，比如点击事件、IO事件、网络事件时，它们就会被加入到eventLoop中，当发现事件队列不为空时，就会取出事件，并且执行。
-
-      参考资料：https://zhuanlan.zhihu.com/p/83781258
-
-11. **Future 的两种状态**
-    1. 未完成状态，执行 Future 内部的操作时，例如网络请求过程，延时过程，我们称这个过程为未完成状态
-    2. 完成状态，当 Future 内部的操作执行完成，通常会返回一个值，或者抛出一个异常。这两种情况，我们都称 Future 为完成状态。
-
-12. **BuildContext 是什么**
+7. **BuildContext 是什么**
   - 根据官方的注释，我们可以知道 BuildContext 实际上就是 `Element` 对象，主要是为了防止开发者直接操作 Element 对象。通过源码我们也可以看到 Element 是实现了 BuildContext 这个抽象类中的接口，那么在当前 Widget 中获取到 context 就可以获取到 Element 的一些信息。如下所示代码：
 
     ```dart
@@ -341,10 +228,10 @@
 
     setState 刷新很复杂，请参考: https://juejin.cn/post/7044865304647696391
 
-13. **Flutter 布局的核心机制**
+8. **Flutter 布局的核心机制**
   - Flutter 布局的核心机制是 `widgets`。在 Flutter 中，几乎所有东西都是 widget，甚至布局模型都是 widgets。你在 Flutter 应用程序中看到的图像，图标和文本都是 widgets。此外不能直接看到的也是 widgets，例如用来排列、限制和对齐可见 widgets 的行、列和网格。
 
-14. **松约束和紧约束**
+9. **松约束和紧约束**
   - 松约束：约束的最小宽度/高度为 0
   - 紧约束：最大/最小宽度是一致的，最小值不为0，高度也一样
   - 如果约束最小值为 0，切最大值也为 0，这个约束同时是松约束和紧约束
@@ -355,7 +242,7 @@
 
   使用 `LayoutBuilder` 组件查看当前的约束，使用 `ConstrainedBox` 组件精准的设置约束
 
-15. **Column 布局的步骤**
+10. **Column 布局的步骤**
   - 先布局没有弹性的组件，然后再布局有弹性的组件
 
     ```dart
@@ -376,19 +263,19 @@
 
     可以在 ListView 包裹一层弹性布局，例如: `Expanded` 或者 `Flexible`，这两个弹性组件会充满 Column 剩余的空间，所以 ListView 的尺寸就得到了自适应。
 
-16. **MainAxisAlignment 枚举的含义**
+11. **MainAxisAlignment 枚举的含义**
   这是一个 Column 或者 Row 组件中布局用到的主轴排列方式
 
   1. spaceEvenly: 平均分陪剩下的空间
   2. spaceBetween: 把剩余的空间插入中间的组件当中，两边没有空间
   3. spaceAround: 每个组件左右或者上下都有相等的空间
 
-17. **Flutter 布局约束的规则**
+12. **Flutter 布局约束的规则**
   - 首先：上层 widget 向下层 widget 传递约束条件
   - 然后：下层 widget 向上层 widget 传递大小信息
   - 最后：上层 widget 决定下层 widget 的位置。
 
-18. **Stack 布局的规则**
+13. **Stack 布局的规则**
   - Stack 优先布局没有位置的组件，Stack 的大小由没有位置的组件中最大的一个组件决定，然后在布局有定位的组件（使用 Positioned 包裹的组件）。如果同时存在没有位置的组件和使用 Positioned 包裹的位置组件，还是以没有位置组件最大的组件决定 Stack 的大小，即使使用 Positioned.fill 包裹的组件也是以没有位置的最大的组件决定 Stack 的大小，此时 Positioned.fill 的大小就是没有位置最大的组件的大小。
 
   - 如果 Stack 中全是 Positioned 定位组件，Stack 的尺寸就是最大（可能会达到父级组件的大小）。
@@ -400,7 +287,7 @@
 
   - clipBehavior 属性，默认 `hardEdge`，溢出就裁切边沿部分，可以设置成 `Clip.none` 不裁切
 
-19. **Container 的默认尺寸**
+14. **Container 的默认尺寸**
 
     1. 不存在 child 的情况，首先在结合父组件传递的约束和 Container 自身的width, height, constraints 属性计算约束
       - 如果计算出来的约束时有界的，则尽量占满
@@ -411,7 +298,7 @@
       - 如果设置了对齐（alignment）方式，但是某个纬度的约束无界，Container 还是在会无界约束的维度尽可能的小，以便匹配 child 的尺寸
       - 如果设置了对齐（alignment）方式，约束是有界的，Container 会尽可能的放大，为对齐方式创造条件
       
-20. **Container 的本质**
+15. **Container 的本质**
   - Container 是一个结合了尺寸，形状，背景颜色，间距，留白，约束，装饰等功能于一身的组件，以属性的方式设置对应的值，这样就不需要层层嵌套。Container 是由 LimitedBox、ColoredBox、 ConstrainedBox、 Align、 Padding、 DecoratedBox 和 Transform 组成的，你也可以通过查看源码看到这些组合。
 
   - Container 中各种属性所对应的组件：
@@ -423,7 +310,7 @@
     - 存在 constraints 就包裹一层 `ConstrainedBox` 组件
     - 存在 transform 就包裹一层 `Transform` 组件
 
-21. **LimitedBox 是什么**
+16. **LimitedBox 是什么**
   - 当其自身不受约束时才限制其大小的盒子。
   - 如果受到了约束限制，其中的 maxWidth 和 maxHeight 不起作用。
 
@@ -439,7 +326,7 @@
       ```
     上述代码中，LimitedBox 收到约束影响，maxWidth、maxHeight 就不起作用，就会展示 child 的 ConstrainedBox 组件，ConstrainedBox 组件的约束是 expand，expand 方法中默认值是 double.infinity，此时 child 就会充满父组件。
 
-22. **状态管理的作用，为什么需要状态管理**
+17. **状态管理的作用，为什么需要状态管理**
 
     - `数据共享和同步`：在应用程序中，不同部分可能需要共享和同步数据。通过状态管理，可以轻松地在应用程序的各个部分之间共享数据，并确保数据的一致性。
     - `UI更新`：Flutter 状态管理可以帮助开发者管理应用程序中的UI状态，以便在数据变化时更新用户界面。这样可以确保应用程序的UI与数据的状态保持同步。
@@ -447,13 +334,13 @@
     - `性能优化`：有效的状态管理可以帮助应用程序避免不必要的重绘和重新构建，从而提高应用程序的性能和响应速度。
     - `代码结构`：通过良好的状态管理，开发者可以更好地组织应用程序的代码结构，使其更易于理解和维护。
 
-23. **Flutter 程序的编译模式**
+18. **Flutter 程序的编译模式**
 
   1. Release 模式，使用 AOT 编译模式直接生成对应平台（x86、ARM）的机器码，执行效率高，性能好，只支持真机。
   2. Profile 模式，和 Release 模式类似，只是此模式可以使用 DevTools 来检测性能。
   3. Debug 模式，使用 JIT 即使编译技术，支持热重载（hot reload）等功能，但是性能没有 Release 模式好。
 
-24. **Flutter 中的 Key 的分类**
+19. **Flutter 中的 Key 的分类**
 
     - LocalKey，实现类有 ValueKey、ObjectKey、UniqueKey，LocalKey是一个抽象类，它是 GlobalKey 的基类。它主要用于在当前 Widget 树内唯一标识一个 Widget。
     - GlobalKey，实现类有 LabeledGlobalKey、GlobalObjectKey，GlobalKey 是全局唯一标识一个 Widget 的 Key。它通常用于在整个应用程序中引用一个 Widget，例如，你可能需要在一个Widget树中的某处访问另一个 Widget 的状态或属性。
