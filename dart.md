@@ -133,9 +133,9 @@
       ```
     上述两种方式中，`spawn` 方法创建的 isolate 功能更多，可以实现自定义；使用 `compute` 创建的 isolate 使用非常简单，适合功能单一的场景。
     
+    >参考资料：https://cloud.tencent.com/developer/article/1860255
 
-  参考资料：https://cloud.tencent.com/developer/article/1860255
-  参考资料：https://ducafecat.com/blog/flutter-isolate
+    >参考资料：https://ducafecat.com/blog/flutter-isolate
 
 2. **Isolate 和线程的区别**
   - 线程与线程之间是共享内存的，而 isolate 和 isolate 之间内存是不共享的，所以叫 isolate (隔离)。
